@@ -129,10 +129,20 @@ public sealed class JsonSettingsService : ISettingsService
                 AppSettings.CurrentSchemaVersion);
         }
 
+        var widgets = settings.Widgets ?? [];
+        var existingIds = widgets
+            .Select(widget => widget.MetricId)
+            .ToHashSet();
+        var migratedWidgets = widgets
+            .Concat(AppSettings.CreateDefault().Widgets.Where(
+                widget => !existingIds.Contains(widget.MetricId)))
+            .OrderBy(widget => widget.Order)
+            .ToArray();
+
         return settings with
         {
             SchemaVersion = AppSettings.CurrentSchemaVersion,
-            Widgets = settings.Widgets ?? AppSettings.CreateDefault().Widgets
+            Widgets = migratedWidgets
         };
     }
 

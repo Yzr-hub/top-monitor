@@ -1,6 +1,9 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 using Serilog.Core;
 using TopMonitor.Domain.Configuration;
+using TopMonitor.Domain.Metrics;
 using TopMonitor.Infrastructure.Configuration;
 
 namespace TopMonitor.Application.Tests;
@@ -51,6 +54,46 @@ public sealed class JsonSettingsServiceTests : IDisposable
 
         Assert.Equivalent(AppSettings.CreateDefault(), settings, strict: true);
         Assert.NotEmpty(Directory.GetFiles(_directory, "settings.corrupt-*.json"));
+    }
+
+    [Fact]
+    public async Task Version_one_settings_add_FPS_without_replacing_user_widgets()
+    {
+        Directory.CreateDirectory(_directory);
+        var defaults = AppSettings.CreateDefault();
+        var legacy = defaults with
+        {
+            SchemaVersion = 1,
+            Widgets =
+            [
+                new WidgetConfig(
+                    MetricIds.CpuTotalLoad,
+                    false,
+                    20,
+                    "My CPU",
+                    "0")
+            ]
+        };
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, "settings.json"),
+            JsonSerializer.Serialize(legacy, options));
+
+        var loaded = await CreateService().LoadAsync(CancellationToken.None);
+
+        Assert.Contains(
+            loaded.Widgets,
+            widget => widget.MetricId == MetricIds.ForegroundFps);
+        Assert.Contains(
+            loaded.Widgets,
+            widget => widget.MetricId == MetricIds.CpuTotalLoad &&
+                      !widget.Enabled &&
+                      widget.Label == "My CPU");
+        Assert.Equal(AppSettings.CurrentSchemaVersion, loaded.SchemaVersion);
     }
 
     public void Dispose()

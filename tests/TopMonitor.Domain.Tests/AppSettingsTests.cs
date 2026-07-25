@@ -32,4 +32,16 @@ public sealed class AppSettingsTests
 
         Assert.NotSame(first.Widgets, second.Widgets);
     }
+
+    [Fact]
+    public void Defaults_include_disabled_foreground_fps()
+    {
+        var fps = Assert.Single(
+            AppSettings.CreateDefault().Widgets,
+            widget => widget.MetricId == MetricIds.ForegroundFps);
+
+        Assert.False(fps.Enabled);
+        Assert.Equal("FPS", fps.Label);
+        Assert.Equal("0", fps.NumberFormat);
+    }
 }

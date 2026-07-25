@@ -197,6 +197,13 @@ public sealed class OverlayViewModel : ObservableObject, IDisposable
                 TimeSpan.FromMilliseconds(500),
                 false),
             new MetricDefinition(
+                MetricIds.ForegroundFps,
+                "前台游戏帧率",
+                MetricCategory.Other,
+                string.Empty,
+                TimeSpan.FromMilliseconds(500),
+                false),
+            new MetricDefinition(
                 MetricIds.MemoryUsagePercent,
                 "内存使用率",
                 MetricCategory.Memory,

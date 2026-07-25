@@ -15,6 +15,8 @@ public static class MetricIds
     public static readonly MetricId Gpu0MemoryUsed = new("hardware.gpu.0.memory.used");
     public static readonly MetricId Gpu0TotalPower = new("hardware.gpu.0.power.total");
 
+    public static readonly MetricId ForegroundFps = new("graphics.foreground.fps");
+
     public static readonly MetricId MemoryUsagePercent = new("system.memory.usage.percent");
     public static readonly MetricId MemoryUsedBytes = new("system.memory.used.bytes");
 

@@ -15,7 +15,7 @@ public sealed record AppSettings(
     bool MinimizeOnStartup,
     CloseBehavior CloseBehavior)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>
     /// 每次返回独立的默认配置，避免调用方意外共享可变集合。
@@ -54,6 +54,7 @@ public sealed record AppSettings(
             new WidgetConfig(MetricIds.MemoryUsagePercent, true, 50, "RAM", "0"),
             new WidgetConfig(MetricIds.MemoryUsedBytes, false, 60, "RAM", "0.0"),
             new WidgetConfig(MetricIds.ActiveNetworkDownload, false, 70, "↓", "0.0"),
-            new WidgetConfig(MetricIds.ActiveNetworkUpload, false, 80, "↑", "0.0")
+            new WidgetConfig(MetricIds.ActiveNetworkUpload, false, 80, "↑", "0.0"),
+            new WidgetConfig(MetricIds.ForegroundFps, false, 90, "FPS", "0")
         };
 }
