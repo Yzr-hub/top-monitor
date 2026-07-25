@@ -31,7 +31,7 @@ TopMonitor 日常运行保持普通用户权限。需要安装硬件访问驱动
 ### TopMonitor.Domain
 
 - 新增稳定指标 ID `graphics.foreground.fps`。
-- FPS 的展示单位为 `FPS`。
+- FPS 使用标签 `FPS`、空单位，最终显示为 `FPS 100`，避免重复成 `FPS 100FPS`。
 - 默认配置包含 FPS Widget，用户可以启用、禁用和排序。
 - 配置迁移必须为旧版 `settings.json` 补充 FPS Widget，不能覆盖用户已有设置。
 
