@@ -8,11 +8,13 @@ using TopMonitor.App.Services;
 using TopMonitor.App.ViewModels;
 using TopMonitor.Application.Configuration;
 using TopMonitor.Application.Displays;
+using TopMonitor.Application.Fps;
 using TopMonitor.Application.Hardware;
 using TopMonitor.Application.Metrics;
 using TopMonitor.Domain.Configuration;
 using TopMonitor.Infrastructure.Hardware;
 using TopMonitor.Infrastructure.Configuration;
+using TopMonitor.Infrastructure.Fps;
 using TopMonitor.Infrastructure.Network;
 using TopMonitor.Infrastructure.Windows;
 
@@ -107,6 +109,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IStartupService>(
             new WindowsStartupService(Environment.ProcessPath ?? "TopMonitor.exe"));
         services.AddSingleton<IDisplayService, WindowsDisplayService>();
+        services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IPawnIoProbe, PawnIoProbe>();
         services.AddSingleton<IElevatedProcessRunner, ElevatedProcessRunner>();
         services.AddSingleton<IHardwareAccessService>(provider =>
@@ -121,6 +124,15 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IMetricProvider, WindowsCpuMetricProvider>();
         services.AddSingleton<IMetricProvider, WindowsMemoryMetricProvider>();
         services.AddSingleton<IMetricProvider, NetworkMetricProvider>();
+        services.AddSingleton<IForegroundProcessService,
+            WindowsForegroundProcessService>();
+        services.AddSingleton<IPresentMonSessionFactory>(provider =>
+            new PresentMonSessionFactory(Path.Combine(
+                AppContext.BaseDirectory,
+                "Dependencies",
+                "PresentMon.exe")));
+        services.AddSingleton<ForegroundFpsTracker>();
+        services.AddSingleton<IMetricProvider, PresentMonFpsProvider>();
 
         services.AddSingleton<MetricValueCache>();
         services.AddSingleton<MetricSamplingService>();
