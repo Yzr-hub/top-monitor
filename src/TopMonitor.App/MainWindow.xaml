@@ -25,17 +25,26 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <TextBlock Margin="{Binding DataContext.HorizontalSpacing,
-                                                RelativeSource={RelativeSource AncestorType=Window},
-                                                Converter={x:Static converters:HorizontalSpacingConverter.Instance}}"
-                               VerticalAlignment="Center"
-                               FontFamily="Segoe UI"
-                               FontSize="{Binding DataContext.FontSize,
-                                                  RelativeSource={RelativeSource AncestorType=Window}}"
-                               FontWeight="SemiBold"
-                               Foreground="{Binding DataContext.TextColor,
-                                                   RelativeSource={RelativeSource AncestorType=Window}}"
-                               Text="{Binding DisplayText}" />
+                    <Grid Margin="{Binding DataContext.HorizontalSpacing,
+                                           RelativeSource={RelativeSource AncestorType=Window},
+                                           Converter={x:Static converters:HorizontalSpacingConverter.Instance}}"
+                          VerticalAlignment="Center"
+                          TextElement.FontFamily="Segoe UI"
+                          TextElement.FontSize="{Binding DataContext.FontSize,
+                                                        RelativeSource={RelativeSource AncestorType=Window}}"
+                          TextElement.FontWeight="SemiBold"
+                          TextElement.Foreground="{Binding DataContext.TextColor,
+                                                          RelativeSource={RelativeSource AncestorType=Window}}">
+                        <TextBlock x:Name="ReservationSizer"
+                                   IsHitTestVisible="False"
+                                   Opacity="0"
+                                   Text="{Binding ReservationText}" />
+                        <TextBlock Width="{Binding ActualWidth,
+                                                   ElementName=ReservationSizer}"
+                                   Text="{Binding DisplayText}"
+                                   TextAlignment="Right"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>

@@ -22,16 +22,73 @@ public static class MetricFormatter
         ArgumentNullException.ThrowIfNull(value);
 
         var provider = formatProvider ?? CultureInfo.CurrentCulture;
-        var formattedValue = value.Status == MetricStatus.Available && value.Value is { } number
-            ? number.ToString(widget.NumberFormat, provider)
-            : "--";
+        var formattedValue =
+            value.Status == MetricStatus.Available && value.Value is { } number
+                ? FormatAvailableValue(
+                    definition,
+                    widget,
+                    number,
+                    showUnit,
+                    provider)
+                : "--";
         var label = showLabel && !string.IsNullOrWhiteSpace(widget.Label)
             ? $"{widget.Label} "
             : string.Empty;
-        var unit = showUnit && value.Status == MetricStatus.Available
-            ? definition.Unit
-            : string.Empty;
 
-        return $"{label}{formattedValue}{unit}";
+        return $"{label}{formattedValue}";
+    }
+
+    private static string FormatAvailableValue(
+        MetricDefinition definition,
+        WidgetConfig widget,
+        double number,
+        bool showUnit,
+        IFormatProvider provider)
+    {
+        if (definition.Id == MetricIds.MemoryUsedBytes)
+        {
+            return FormatBytes(
+                number,
+                widget.NumberFormat,
+                showUnit,
+                perSecond: false,
+                provider);
+        }
+
+        if (definition.Id == MetricIds.ActiveNetworkDownload ||
+            definition.Id == MetricIds.ActiveNetworkUpload)
+        {
+            return FormatBytes(
+                number,
+                widget.NumberFormat,
+                showUnit,
+                perSecond: true,
+                provider);
+        }
+
+        var unit = showUnit ? definition.Unit : string.Empty;
+        return $"{number.ToString(widget.NumberFormat, provider)}{unit}";
+    }
+
+    private static string FormatBytes(
+        double bytes,
+        string numberFormat,
+        bool showUnit,
+        bool perSecond,
+        IFormatProvider provider)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var unitIndex = 0;
+        var compactValue = bytes;
+        while (Math.Abs(compactValue) >= 1024 && unitIndex < units.Length - 1)
+        {
+            compactValue /= 1024;
+            unitIndex++;
+        }
+
+        var unit = showUnit
+            ? $"{units[unitIndex]}{(perSecond ? "/s" : string.Empty)}"
+            : string.Empty;
+        return $"{compactValue.ToString(numberFormat, provider)}{unit}";
     }
 }

@@ -17,6 +17,12 @@ public sealed class MetricItemViewModel(
 
     public int Order => widget.Order;
 
+    public string ReservationText { get; } = MetricDisplayReservation.Create(
+        definition,
+        widget,
+        showLabel,
+        showUnit);
+
     public string DisplayText
     {
         get => _displayText;

@@ -70,4 +70,68 @@ public sealed class MetricFormatterTests
 
         Assert.Equal("CPU --", text);
     }
+
+    [Fact]
+    public void Memory_bytes_use_a_compact_binary_unit()
+    {
+        var definition = new MetricDefinition(
+            MetricIds.MemoryUsedBytes,
+            "内存已使用",
+            MetricCategory.Memory,
+            "B",
+            TimeSpan.FromSeconds(1),
+            false);
+        var widget = new WidgetConfig(
+            MetricIds.MemoryUsedBytes,
+            true,
+            10,
+            "RAM",
+            "0.0");
+        var value = MetricValue.Create(
+            MetricIds.MemoryUsedBytes,
+            15_308_623_872,
+            DateTimeOffset.UtcNow);
+
+        var text = MetricFormatter.Format(
+            definition,
+            widget,
+            value,
+            showLabel: true,
+            showUnit: true,
+            CultureInfo.InvariantCulture);
+
+        Assert.Equal("RAM 14.3GB", text);
+    }
+
+    [Fact]
+    public void Network_bytes_per_second_use_a_compact_binary_unit()
+    {
+        var definition = new MetricDefinition(
+            MetricIds.ActiveNetworkDownload,
+            "下载速度",
+            MetricCategory.Network,
+            "B/s",
+            TimeSpan.FromSeconds(1),
+            false);
+        var widget = new WidgetConfig(
+            MetricIds.ActiveNetworkDownload,
+            true,
+            10,
+            "↓",
+            "0.0");
+        var value = MetricValue.Create(
+            MetricIds.ActiveNetworkDownload,
+            12_582_912,
+            DateTimeOffset.UtcNow);
+
+        var text = MetricFormatter.Format(
+            definition,
+            widget,
+            value,
+            showLabel: true,
+            showUnit: true,
+            CultureInfo.InvariantCulture);
+
+        Assert.Equal("↓ 12.0MB/s", text);
+    }
 }
