@@ -98,7 +98,8 @@
             </TabItem>
 
             <TabItem Header="行为">
-                <StackPanel Margin="20">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
                     <TextBlock Text="刷新模式" />
                     <ComboBox Width="180"
                               Margin="0,4,0,14"
@@ -135,7 +136,8 @@
                             HorizontalAlignment="Left"
                             Command="{Binding ConfigureFpsPermissionCommand}"
                             Content="配置 FPS 权限" />
-                </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <TabItem Header="显示器">
