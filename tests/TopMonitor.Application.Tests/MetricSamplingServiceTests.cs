@@ -113,6 +113,37 @@ public sealed class MetricSamplingServiceTests
     }
 
     [Fact]
+    public async Task Repeated_samples_reuse_the_provider_metric_plan()
+    {
+        var provider = new FakeMetricProvider(
+        [
+            CreateDefinition(MetricIds.CpuTotalLoad),
+            CreateDefinition(MetricIds.MemoryUsagePercent)
+        ]);
+        await using var service = CreateService(provider, new MetricValueCache());
+        await service.UpdateSubscriptionsAsync(
+            [
+                new MetricSubscription(
+                    MetricIds.CpuTotalLoad,
+                    TimeSpan.FromMilliseconds(20)),
+                new MetricSubscription(
+                    MetricIds.MemoryUsagePercent,
+                    TimeSpan.FromMilliseconds(20))
+            ],
+            CancellationToken.None);
+
+        await service.StartAsync(CancellationToken.None);
+        await EventuallyAsync(() => provider.ReadCount >= 3);
+        await service.StopAsync(CancellationToken.None);
+
+        var firstRequest = provider.Requests[0];
+        Assert.All(provider.Requests, request => Assert.Same(firstRequest, request));
+        Assert.Equal(
+            [MetricIds.CpuTotalLoad, MetricIds.MemoryUsagePercent],
+            firstRequest.OrderBy(id => id.Value));
+    }
+
+    [Fact]
     public async Task Cache_ignores_timestamp_only_changes()
     {
         var cache = new MetricValueCache();

@@ -24,6 +24,20 @@ dotnet run --project src/TopMonitor.App/TopMonitor.App.csproj -c Debug
 
 性能分析可使用 Visual Studio Diagnostic Tools、`dotnet-counters`、Windows 任务管理器和 PerfView。重点观察 CPU、工作集、GC 分配率、线程数以及最小化/静置时的资源变化。
 
+仓库提供可重复的进程采样脚本：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\measure-performance.ps1 `
+  -ProcessName TopMonitor `
+  -Seconds 60 `
+  -OutputPath artifacts\performance\idle.csv
+```
+
+脚本要求目标进程恰好只有一个，并记录 CPU、工作集、私有字节、线程、
+句柄和 PresentMon 是否运行。当前基线与优化决策记录在
+`docs/performance-baseline.md`。
+
 ## 添加一个新指标
 
 1. 在 Domain 的 `MetricIds` 增加稳定 ID。

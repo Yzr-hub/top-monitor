@@ -196,7 +196,8 @@ public sealed class MetricSamplingService : IAsyncDisposable
             .GroupBy(subscription => subscription.Interval)
             .Select(group => RunSamplingGroupAsync(
                 group.Key,
-                group.Select(subscription => subscription.MetricId).ToArray(),
+                BuildProviderRequests(
+                    group.Select(subscription => subscription.MetricId)),
                 _workerCancellation.Token))
             .ToArray();
     }
@@ -227,14 +228,25 @@ public sealed class MetricSamplingService : IAsyncDisposable
 
     private async Task RunSamplingGroupAsync(
         TimeSpan interval,
-        IReadOnlyCollection<MetricId> metricIds,
+        ProviderRequest[] requests,
         CancellationToken cancellationToken)
     {
+        var pendingReads = new Task[requests.Length];
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await SampleOnceAsync(metricIds, cancellationToken);
+                for (var index = 0; index < requests.Length; index++)
+                {
+                    var request = requests[index];
+                    pendingReads[index] = ReadProviderAsync(
+                        request.Provider,
+                        request.MetricIds,
+                        cancellationToken);
+                }
+
+                await Task.WhenAll(pendingReads);
+                Array.Clear(pendingReads);
                 await Task.Delay(interval, cancellationToken);
             }
         }
@@ -244,20 +256,12 @@ public sealed class MetricSamplingService : IAsyncDisposable
         }
     }
 
-    private async Task SampleOnceAsync(
-        IReadOnlyCollection<MetricId> metricIds,
-        CancellationToken cancellationToken)
-    {
-        var requests = metricIds
+    private ProviderRequest[] BuildProviderRequests(
+        IEnumerable<MetricId> metricIds) =>
+        metricIds
             .GroupBy(metricId => _owners[metricId])
-            .Select(group => ReadProviderAsync(
-                group.Key,
-                group.ToArray(),
-                cancellationToken))
+            .Select(group => new ProviderRequest(group.Key, group.ToArray()))
             .ToArray();
-
-        await Task.WhenAll(requests);
-    }
 
     private async Task ReadProviderAsync(
         IMetricProvider provider,
@@ -314,4 +318,8 @@ public sealed class MetricSamplingService : IAsyncDisposable
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+
+    private sealed record ProviderRequest(
+        IMetricProvider Provider,
+        MetricId[] MetricIds);
 }

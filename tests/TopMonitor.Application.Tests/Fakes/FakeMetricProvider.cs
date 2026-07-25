@@ -12,6 +12,8 @@ internal sealed class FakeMetricProvider(
 
     public IReadOnlyList<MetricId> LastRequestedMetricIds { get; private set; } = [];
 
+    public List<IReadOnlyCollection<MetricId>> Requests { get; } = [];
+
     public int ReadCount => Volatile.Read(ref _readCount);
 
     public Exception? ReadException { get; init; }
@@ -31,6 +33,7 @@ internal sealed class FakeMetricProvider(
     {
         cancellationToken.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _readCount);
+        Requests.Add(metricIds);
         LastRequestedMetricIds = metricIds.ToArray();
         if (ReadException is not null)
         {
