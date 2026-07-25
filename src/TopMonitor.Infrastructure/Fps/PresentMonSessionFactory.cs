@@ -68,8 +68,7 @@ public sealed class PresentMonSessionFactory(string executablePath)
         startInfo.ArgumentList.Add("--v1_metrics");
         startInfo.ArgumentList.Add("--terminate_on_proc_exit");
         startInfo.ArgumentList.Add("--session_name");
-        startInfo.ArgumentList.Add(
-            $"TopMonitor_{Environment.ProcessId}_{processId}");
+        startInfo.ArgumentList.Add("TopMonitorCapture");
         startInfo.ArgumentList.Add("--stop_existing_session");
         return startInfo;
     }

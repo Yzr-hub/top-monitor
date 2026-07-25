@@ -15,7 +15,7 @@ public sealed class PresentMonSessionFactoryTests
         Assert.True(options.RedirectStandardOutput);
         Assert.True(options.RedirectStandardError);
         Assert.Equal(
-            $"--process_id 4242 --output_stdout --v1_metrics --terminate_on_proc_exit --session_name TopMonitor_{Environment.ProcessId}_4242 --stop_existing_session",
+            "--process_id 4242 --output_stdout --v1_metrics --terminate_on_proc_exit --session_name TopMonitorCapture --stop_existing_session",
             string.Join(" ", options.ArgumentList));
     }
 }
