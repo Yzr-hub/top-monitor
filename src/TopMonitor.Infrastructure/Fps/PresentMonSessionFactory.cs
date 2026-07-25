@@ -70,6 +70,7 @@ public sealed class PresentMonSessionFactory(string executablePath)
         startInfo.ArgumentList.Add("--session_name");
         startInfo.ArgumentList.Add(
             $"TopMonitor_{Environment.ProcessId}_{processId}");
+        startInfo.ArgumentList.Add("--stop_existing_session");
         return startInfo;
     }
 }
