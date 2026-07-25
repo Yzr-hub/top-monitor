@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using Microsoft.Extensions.Logging;
 using TopMonitor.App.ViewModels;
 using TopMonitor.Application.Displays;
@@ -20,6 +21,7 @@ public partial class MainWindow : Window
     private readonly IDisplayService _displayService;
     private readonly ILogger<MainWindow> _logger;
     private nint _windowHandle;
+    private bool _repositionPending;
 
     public MainWindow(
         OverlayViewModel viewModel,
@@ -36,6 +38,7 @@ public partial class MainWindow : Window
 
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
+        SizeChanged += OnSizeChanged;
         Closing += OnClosing;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.PlacementChanged += OnPlacementChanged;
@@ -54,11 +57,12 @@ public partial class MainWindow : Window
         else
         {
             Show();
-            PositionAtTopCenter();
+            SchedulePositionAtConfiguredAnchor();
         }
     }
 
-    public void RepositionToConfiguredDisplay() => PositionAtTopCenter();
+    public void RepositionToConfiguredDisplay() =>
+        SchedulePositionAtConfiguredAnchor();
 
     private void OnSourceInitialized(object? sender, EventArgs eventArgs)
     {
@@ -66,7 +70,16 @@ public partial class MainWindow : Window
         ApplyWindowStyles();
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs eventArgs) => PositionAtTopCenter();
+    private void OnLoaded(object sender, RoutedEventArgs eventArgs) =>
+        SchedulePositionAtConfiguredAnchor();
+
+    private void OnSizeChanged(object sender, SizeChangedEventArgs eventArgs)
+    {
+        if (_viewModel.CurrentSettings.Overlay.Anchor != OverlayAnchor.Custom)
+        {
+            SchedulePositionAtConfiguredAnchor();
+        }
+    }
 
     private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs eventArgs)
     {
@@ -104,7 +117,24 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PositionAtTopCenter()
+    private void SchedulePositionAtConfiguredAnchor()
+    {
+        if (_repositionPending)
+        {
+            return;
+        }
+
+        _repositionPending = true;
+        _ = Dispatcher.BeginInvoke(
+            new Action(() =>
+            {
+                _repositionPending = false;
+                PositionAtConfiguredAnchor();
+            }),
+            DispatcherPriority.Loaded);
+    }
+
+    private void PositionAtConfiguredAnchor()
     {
         var settings = _viewModel.CurrentSettings;
         var display = _displayService.GetDisplays()
@@ -114,13 +144,12 @@ public partial class MainWindow : Window
         var top = display?.Top ?? SystemParameters.WorkArea.Top;
         var width = display?.Width ?? SystemParameters.WorkArea.Width;
         var height = display?.Height ?? SystemParameters.WorkArea.Height;
-        var desiredLeft = settings.Overlay.Anchor switch
-        {
-            OverlayAnchor.TopLeft => left,
-            OverlayAnchor.TopRight => left + Math.Max(0, width - ActualWidth),
-            OverlayAnchor.Custom => left + settings.Overlay.OffsetX,
-            _ => left + Math.Max(0, (width - ActualWidth) / 2)
-        };
+        var desiredLeft = OverlayPlacement.CalculateLeft(
+            settings.Overlay.Anchor,
+            left,
+            width,
+            ActualWidth,
+            settings.Overlay.OffsetX);
         var desiredTop = top + settings.Overlay.OffsetY;
         Left = Math.Clamp(
             desiredLeft,
@@ -133,7 +162,7 @@ public partial class MainWindow : Window
     }
 
     private void OnPlacementChanged(object? sender, EventArgs eventArgs) =>
-        PositionAtTopCenter();
+        SchedulePositionAtConfiguredAnchor();
 
     private void OnClosing(object? sender, CancelEventArgs eventArgs)
     {
@@ -141,6 +170,7 @@ public partial class MainWindow : Window
         {
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             _viewModel.PlacementChanged -= OnPlacementChanged;
+            SizeChanged -= OnSizeChanged;
             return;
         }
 
