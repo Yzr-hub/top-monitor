@@ -11,6 +11,7 @@ $publishDirectory = Join-Path $repositoryRoot "artifacts/publish/win-x64"
 
 Push-Location $repositoryRoot
 try {
+    & (Join-Path $PSScriptRoot "fetch-runtime-dependencies.ps1")
     dotnet restore $solutionPath
     dotnet build $solutionPath -c $Configuration --no-restore
     dotnet test $solutionPath -c $Configuration --no-build

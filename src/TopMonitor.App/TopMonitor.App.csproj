@@ -14,6 +14,19 @@
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\third_party\runtime\PresentMon.exe"
+             Link="Dependencies\PresentMon.exe"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             Condition="Exists('..\..\third_party\runtime\PresentMon.exe')" />
+    <Content Include="..\..\third_party\runtime\PawnIO_setup.exe"
+             Link="Dependencies\PawnIO_setup.exe"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             Condition="Exists('..\..\third_party\runtime\PawnIO_setup.exe')" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>

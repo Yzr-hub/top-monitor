@@ -16,7 +16,7 @@
 - CPU temperature candidates are valid only when finite and between `-20°C` and `125°C`.
 - CPU sensor order is Package, Core Max, Package/Tdie equivalent, then maximum valid core temperature.
 - FPS sampling is enabled only when the FPS Widget is enabled; PresentMon must not remain running without a candidate game.
-- PresentMon is pinned to `2.4.1` x64 with SHA-256 `D74183E7AE630F72CD3690BE0373ECBFD6CBB86578148AAB8FA2A7166068F34`.
+- PresentMon is pinned to `2.4.1` x64 with SHA-256 `D74183E7AE630F72CD3690BE0373ECBFDC6CBB86578148AAB8FA2A7166068F34`.
 - PawnIO setup is sourced from LibreHardwareMonitor tag `v0.9.6` with SHA-256 `A3A46226C5E2824F4CDD42BE0EECBABFC672C86F7889710F5AB1E6AD385B47A0`.
 - Real-time value changes must not resize the overlay; configuration changes may recalculate slot widths once.
 - Use cancellation for all background work, throttle repeated errors, and clean up PresentMon/ETW sessions on exit.
@@ -1085,7 +1085,7 @@ $dependencies = @(
     @{
         Name = 'PresentMon.exe'
         Uri = 'https://github.com/GameTechDev/PresentMon/releases/download/v2.4.1/PresentMon-2.4.1-x64.exe'
-        Sha256 = 'D74183E7AE630F72CD3690BE0373ECBFD6CBB86578148AAB8FA2A7166068F34'
+        Sha256 = 'D74183E7AE630F72CD3690BE0373ECBFDC6CBB86578148AAB8FA2A7166068F34'
     },
     @{
         Name = 'PawnIO_setup.exe'
