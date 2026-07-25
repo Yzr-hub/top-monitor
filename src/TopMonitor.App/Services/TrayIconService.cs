@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using H.NotifyIcon;
 using Microsoft.Extensions.Logging;
 using TopMonitor.App.Commands;
@@ -51,14 +52,7 @@ public sealed class TrayIconService : IDisposable
         _taskbarIcon = new TaskbarIcon
         {
             ToolTipText = "TopMonitor",
-            IconSource = new GeneratedIconSource
-            {
-                Text = "TM",
-                Foreground = Brushes.White,
-                Background = new SolidColorBrush(Color.FromRgb(25, 30, 39)),
-                FontSize = 42,
-                FontWeight = FontWeights.Bold
-            },
+            IconSource = LoadIconSource(),
             ContextMenu = contextMenu,
             LeftClickCommand = new RelayCommand(_window.ToggleVisibility)
         };
@@ -66,6 +60,19 @@ public sealed class TrayIconService : IDisposable
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         UpdateToggleHeaders();
         _taskbarIcon.ForceCreate();
+    }
+
+    private static ImageSource LoadIconSource()
+    {
+        var icon = new BitmapImage();
+        icon.BeginInit();
+        icon.UriSource = new Uri(
+            "pack://application:,,,/Assets/TopMonitor.ico",
+            UriKind.Absolute);
+        icon.CacheOption = BitmapCacheOption.OnLoad;
+        icon.EndInit();
+        icon.Freeze();
+        return icon;
     }
 
     public void Dispose()
