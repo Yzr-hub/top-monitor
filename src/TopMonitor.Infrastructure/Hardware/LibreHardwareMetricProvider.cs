@@ -13,6 +13,8 @@ public sealed class LibreHardwareMetricProvider(ILogger logger) : IMetricProvide
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<MetricId, SensorBinding> _bindings = [];
     private readonly Dictionary<MetricId, MetricDefinition> _definitions = [];
+    private readonly HardwareUpdateLimiter _updateLimiter =
+        new(TimeSpan.FromMilliseconds(400));
     private Computer? _computer;
     private DateTimeOffset _nextReadErrorLog;
     private bool _disposed;
@@ -70,7 +72,7 @@ public sealed class LibreHardwareMetricProvider(ILogger logger) : IMetricProvide
                          .Distinct())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                hardware.Update();
+                UpdateHardwareIfDue(hardware);
             }
 
             var timestamp = DateTimeOffset.UtcNow;
@@ -183,7 +185,24 @@ public sealed class LibreHardwareMetricProvider(ILogger logger) : IMetricProvide
         }
 
         cpu.Update();
-        var temperature = SelectSensor(cpu.Sensors, SensorType.Temperature, "Package");
+        var temperatureSensors = cpu.Sensors
+            .Where(sensor => sensor.SensorType == SensorType.Temperature)
+            .OrderBy(sensor => sensor.Index)
+            .ToArray();
+        var candidates = temperatureSensors
+            .Select(sensor => new CpuTemperatureCandidate(
+                sensor.Identifier.ToString(),
+                sensor.Name,
+                sensor.Value))
+            .ToArray();
+        var selection = CpuTemperatureSelector.Select(candidates);
+        var temperature = selection is null
+            ? null
+            : temperatureSensors.FirstOrDefault(sensor =>
+                string.Equals(
+                    sensor.Identifier.ToString(),
+                    selection.Candidate.Id,
+                    StringComparison.Ordinal));
         AddDefinition(
             MetricIds.CpuTemperaturePackage,
             "CPU 温度",
@@ -195,6 +214,13 @@ public sealed class LibreHardwareMetricProvider(ILogger logger) : IMetricProvide
             _bindings[MetricIds.CpuTemperaturePackage] =
                 new SensorBinding(MetricIds.CpuTemperaturePackage, cpu, temperature);
         }
+
+        logger.Information(
+            "CPU temperature discovery for {HardwareName}: candidates {@Candidates}; selected {SelectedSensor} ({SelectionReason})",
+            cpu.Name,
+            candidates,
+            selection?.Candidate.Name,
+            selection?.Reason);
     }
 
     private void DiscoverGpus(IReadOnlyCollection<IHardware> hardware)
@@ -268,6 +294,16 @@ public sealed class LibreHardwareMetricProvider(ILogger logger) : IMetricProvide
         return candidates.FirstOrDefault(sensor =>
                    sensor.Name.Contains(preferredName, StringComparison.OrdinalIgnoreCase))
                ?? candidates.FirstOrDefault();
+    }
+
+    private void UpdateHardwareIfDue(IHardware hardware)
+    {
+        if (_updateLimiter.ShouldUpdate(
+                hardware.Identifier.ToString(),
+                DateTimeOffset.UtcNow))
+        {
+            hardware.Update();
+        }
     }
 
     private static IEnumerable<IHardware> Flatten(IEnumerable<IHardware> hardware)
