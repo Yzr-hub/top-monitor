@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using TopMonitor.App.Commands;
 using TopMonitor.Application.Configuration;
 using TopMonitor.Application.Displays;
+using TopMonitor.Application.Hardware;
 using TopMonitor.Application.Metrics;
 using TopMonitor.Domain.Configuration;
 
@@ -17,6 +18,8 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly SynchronizationContext _synchronizationContext;
     private readonly MetricSamplingService _samplingService;
+    private readonly IHardwareAccessService _hardwareAccessService;
+    private readonly RelayCommand _initializeHardwareAccessCommand;
     private readonly SemaphoreSlim _applyGate = new(1, 1);
     private int _applyRevision;
     private RefreshMode _refreshMode;
@@ -37,6 +40,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private OverlayAnchor _anchor;
     private double _offsetX;
     private double _offsetY;
+    private string _hardwareAccessMessage;
+    private bool _isHardwareAccessBusy;
+    private bool _isHardwareAccessInstalled;
+    private bool _isHardwareInstallerAvailable;
 
     public SettingsViewModel(
         AppSettings settings,
@@ -45,6 +52,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IStartupService startupService,
         IDisplayService displayService,
         MetricSamplingService samplingService,
+        IHardwareAccessService hardwareAccessService,
         ILogger<SettingsViewModel> logger)
     {
         _overlay = overlay;
@@ -52,6 +60,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _startupService = startupService;
         _logger = logger;
         _samplingService = samplingService;
+        _hardwareAccessService = hardwareAccessService;
         _synchronizationContext =
             SynchronizationContext.Current ?? new SynchronizationContext();
         _refreshMode = settings.RefreshMode;
@@ -72,6 +81,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _anchor = settings.Overlay.Anchor;
         _offsetX = settings.Overlay.OffsetX;
         _offsetY = settings.Overlay.OffsetY;
+        var hardwareAccessStatus = hardwareAccessService.GetStatus();
+        _hardwareAccessMessage = hardwareAccessStatus.Message;
+        _isHardwareAccessInstalled = hardwareAccessStatus.IsInstalled;
+        _isHardwareInstallerAvailable = hardwareAccessStatus.InstallerAvailable;
 
         Widgets = new ObservableCollection<MetricSettingItemViewModel>(
             settings.Widgets
@@ -82,6 +95,12 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         MoveDownCommand = new RelayCommand<MetricSettingItemViewModel>(item => Move(item, 1));
         RestoreDefaultsCommand = new RelayCommand(RestoreDefaults);
         SaveCommand = new RelayCommand(QueueApply);
+        _initializeHardwareAccessCommand = new RelayCommand(
+            InitializeHardwareAccess,
+            () => !_isHardwareAccessBusy &&
+                  !_isHardwareAccessInstalled &&
+                  _isHardwareInstallerAvailable);
+        InitializeHardwareAccessCommand = _initializeHardwareAccessCommand;
         samplingService.ValuesChanged += OnMetricValuesChanged;
     }
 
@@ -101,6 +120,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     public ICommand MoveDownCommand { get; }
     public ICommand RestoreDefaultsCommand { get; }
     public ICommand SaveCommand { get; }
+    public ICommand InitializeHardwareAccessCommand { get; }
 
     public RefreshMode RefreshMode { get => _refreshMode; set => SetAndApply(ref _refreshMode, value); }
     public double FontSize { get => _fontSize; set => SetAndApply(ref _fontSize, value); }
@@ -120,6 +140,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     public OverlayAnchor Anchor { get => _anchor; set => SetAndApply(ref _anchor, value); }
     public double OffsetX { get => _offsetX; set => SetAndApply(ref _offsetX, value); }
     public double OffsetY { get => _offsetY; set => SetAndApply(ref _offsetY, value); }
+    public string HardwareAccessMessage
+    {
+        get => _hardwareAccessMessage;
+        private set => SetProperty(ref _hardwareAccessMessage, value);
+    }
 
     public void Dispose()
     {
@@ -182,6 +207,39 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         FontSize = defaults.Overlay.FontSize;
         Opacity = defaults.Overlay.Opacity;
         QueueApply();
+    }
+
+    private async void InitializeHardwareAccess()
+    {
+        if (_isHardwareAccessBusy)
+        {
+            return;
+        }
+
+        _isHardwareAccessBusy = true;
+        _initializeHardwareAccessCommand.RaiseCanExecuteChanged();
+        try
+        {
+            var status = await _hardwareAccessService.InitializeAsync(
+                CancellationToken.None);
+            HardwareAccessMessage = status.Message;
+            _isHardwareAccessInstalled = status.IsInstalled;
+            _isHardwareInstallerAvailable = status.InstallerAvailable;
+            if (status.IsInstalled)
+            {
+                await _samplingService.RescanProvidersAsync(CancellationToken.None);
+            }
+        }
+        catch (Exception exception)
+        {
+            HardwareAccessMessage = "CPU 温度访问初始化失败，请查看日志。";
+            _logger.LogError(exception, "初始化 PawnIO 硬件访问失败");
+        }
+        finally
+        {
+            _isHardwareAccessBusy = false;
+            _initializeHardwareAccessCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private async void QueueApply()

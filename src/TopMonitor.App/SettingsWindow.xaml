@@ -115,6 +115,16 @@
                               HorizontalAlignment="Left"
                               ItemsSource="{Binding CloseBehaviors}"
                               SelectedItem="{Binding CloseBehavior}" />
+                    <Separator Margin="0,18,0,12" />
+                    <TextBlock FontWeight="SemiBold"
+                               Text="CPU 温度访问" />
+                    <TextBlock Margin="0,6,0,10"
+                               Text="{Binding HardwareAccessMessage}"
+                               TextWrapping="Wrap" />
+                    <Button Width="180"
+                            HorizontalAlignment="Left"
+                            Command="{Binding InitializeHardwareAccessCommand}"
+                            Content="初始化 CPU 温度访问" />
                 </StackPanel>
             </TabItem>
 

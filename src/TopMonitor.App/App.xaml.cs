@@ -8,6 +8,7 @@ using TopMonitor.App.Services;
 using TopMonitor.App.ViewModels;
 using TopMonitor.Application.Configuration;
 using TopMonitor.Application.Displays;
+using TopMonitor.Application.Hardware;
 using TopMonitor.Application.Metrics;
 using TopMonitor.Domain.Configuration;
 using TopMonitor.Infrastructure.Hardware;
@@ -106,6 +107,15 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IStartupService>(
             new WindowsStartupService(Environment.ProcessPath ?? "TopMonitor.exe"));
         services.AddSingleton<IDisplayService, WindowsDisplayService>();
+        services.AddSingleton<IPawnIoProbe, PawnIoProbe>();
+        services.AddSingleton<IElevatedProcessRunner, ElevatedProcessRunner>();
+        services.AddSingleton<IHardwareAccessService>(provider =>
+            new PawnIoHardwareAccessService(
+                provider.GetRequiredService<IPawnIoProbe>(),
+                provider.GetRequiredService<IElevatedProcessRunner>(),
+                AppContext.BaseDirectory,
+                provider.GetRequiredService<
+                    ILogger<PawnIoHardwareAccessService>>()));
 
         services.AddSingleton<IMetricProvider, LibreHardwareMetricProvider>();
         services.AddSingleton<IMetricProvider, WindowsCpuMetricProvider>();
