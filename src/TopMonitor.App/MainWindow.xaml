@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:TopMonitor.App.Converters"
         Title="TopMonitor"
+        Icon="/Assets/TopMonitor.ico"
         AllowsTransparency="True"
         Background="Transparent"
         Focusable="False"

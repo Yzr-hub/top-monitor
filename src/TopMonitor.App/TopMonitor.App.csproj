@@ -14,6 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="Assets\TopMonitor.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="..\..\third_party\runtime\PresentMon.exe"
              Link="Dependencies\PresentMon.exe"
              CopyToOutputDirectory="PreserveNewest"
@@ -33,6 +37,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\TopMonitor.ico</ApplicationIcon>
     <AssemblyName>TopMonitor</AssemblyName>
     <RootNamespace>TopMonitor.App</RootNamespace>
     <Version>0.1.0</Version>
