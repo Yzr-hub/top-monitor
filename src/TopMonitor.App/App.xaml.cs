@@ -112,6 +112,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IPawnIoProbe, PawnIoProbe>();
         services.AddSingleton<IElevatedProcessRunner, ElevatedProcessRunner>();
+        services.AddSingleton<PerformanceLogUsersService>();
+        services.AddSingleton<MetricPreviewGate>();
         services.AddSingleton<IHardwareAccessService>(provider =>
             new PawnIoHardwareAccessService(
                 provider.GetRequiredService<IPawnIoProbe>(),

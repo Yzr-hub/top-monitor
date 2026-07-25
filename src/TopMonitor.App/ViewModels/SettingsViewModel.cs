@@ -7,6 +7,7 @@ using TopMonitor.Application.Displays;
 using TopMonitor.Application.Hardware;
 using TopMonitor.Application.Metrics;
 using TopMonitor.Domain.Configuration;
+using TopMonitor.Infrastructure.Fps;
 
 namespace TopMonitor.App.ViewModels;
 
@@ -20,6 +21,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly MetricSamplingService _samplingService;
     private readonly IHardwareAccessService _hardwareAccessService;
     private readonly RelayCommand _initializeHardwareAccessCommand;
+    private readonly PerformanceLogUsersService _performanceLogUsersService;
+    private readonly MetricPreviewGate _previewGate;
+    private readonly MetricValueCache _metricValueCache;
+    private readonly RelayCommand _configureFpsPermissionCommand;
     private readonly SemaphoreSlim _applyGate = new(1, 1);
     private int _applyRevision;
     private RefreshMode _refreshMode;
@@ -44,6 +49,9 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private bool _isHardwareAccessBusy;
     private bool _isHardwareAccessInstalled;
     private bool _isHardwareInstallerAvailable;
+    private string _fpsPermissionMessage;
+    private bool _isFpsPermissionBusy;
+    private bool _fpsPermissionSetupComplete;
 
     public SettingsViewModel(
         AppSettings settings,
@@ -53,6 +61,9 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IDisplayService displayService,
         MetricSamplingService samplingService,
         IHardwareAccessService hardwareAccessService,
+        PerformanceLogUsersService performanceLogUsersService,
+        MetricPreviewGate previewGate,
+        MetricValueCache metricValueCache,
         ILogger<SettingsViewModel> logger)
     {
         _overlay = overlay;
@@ -61,6 +72,9 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _logger = logger;
         _samplingService = samplingService;
         _hardwareAccessService = hardwareAccessService;
+        _performanceLogUsersService = performanceLogUsersService;
+        _previewGate = previewGate;
+        _metricValueCache = metricValueCache;
         _synchronizationContext =
             SynchronizationContext.Current ?? new SynchronizationContext();
         _refreshMode = settings.RefreshMode;
@@ -85,6 +99,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _hardwareAccessMessage = hardwareAccessStatus.Message;
         _isHardwareAccessInstalled = hardwareAccessStatus.IsInstalled;
         _isHardwareInstallerAvailable = hardwareAccessStatus.InstallerAvailable;
+        _fpsPermissionSetupComplete =
+            performanceLogUsersService.IsCurrentUserMember();
+        _fpsPermissionMessage = _fpsPermissionSetupComplete
+            ? "当前账户已具备 FPS 采集权限。"
+            : "尚未配置 FPS 采集权限，仅需管理员确认一次。";
 
         Widgets = new ObservableCollection<MetricSettingItemViewModel>(
             settings.Widgets
@@ -101,6 +120,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                   !_isHardwareAccessInstalled &&
                   _isHardwareInstallerAvailable);
         InitializeHardwareAccessCommand = _initializeHardwareAccessCommand;
+        _configureFpsPermissionCommand = new RelayCommand(
+            ConfigureFpsPermission,
+            () => !_isFpsPermissionBusy && !_fpsPermissionSetupComplete);
+        ConfigureFpsPermissionCommand = _configureFpsPermissionCommand;
         samplingService.ValuesChanged += OnMetricValuesChanged;
     }
 
@@ -121,6 +144,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     public ICommand RestoreDefaultsCommand { get; }
     public ICommand SaveCommand { get; }
     public ICommand InitializeHardwareAccessCommand { get; }
+    public ICommand ConfigureFpsPermissionCommand { get; }
 
     public RefreshMode RefreshMode { get => _refreshMode; set => SetAndApply(ref _refreshMode, value); }
     public double FontSize { get => _fontSize; set => SetAndApply(ref _fontSize, value); }
@@ -145,6 +169,25 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         get => _hardwareAccessMessage;
         private set => SetProperty(ref _hardwareAccessMessage, value);
     }
+    public string FpsPermissionMessage
+    {
+        get => _fpsPermissionMessage;
+        private set => SetProperty(ref _fpsPermissionMessage, value);
+    }
+
+    public void SetPreviewActive(bool active)
+    {
+        _previewGate.SetActive(active);
+        if (!active)
+        {
+            return;
+        }
+
+        foreach (var value in _metricValueCache.Snapshot().Values)
+        {
+            Widgets.FirstOrDefault(item => item.MetricId == value.Id)?.Update(value);
+        }
+    }
 
     public void Dispose()
     {
@@ -162,6 +205,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
     private void OnMetricValuesChanged(object? sender, MetricValuesChangedEventArgs eventArgs)
     {
+        if (!_previewGate.ShouldProcess)
+        {
+            return;
+        }
+
         _synchronizationContext.Post(
             _ =>
             {
@@ -239,6 +287,43 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         {
             _isHardwareAccessBusy = false;
             _initializeHardwareAccessCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private async void ConfigureFpsPermission()
+    {
+        if (_isFpsPermissionBusy)
+        {
+            return;
+        }
+
+        _isFpsPermissionBusy = true;
+        _configureFpsPermissionCommand.RaiseCanExecuteChanged();
+        try
+        {
+            var configured =
+                await _performanceLogUsersService.AddCurrentUserAsync(
+                    CancellationToken.None);
+            if (configured)
+            {
+                _fpsPermissionSetupComplete = true;
+                FpsPermissionMessage =
+                    "FPS 权限已配置，请注销并重新登录 Windows 后生效。";
+            }
+            else
+            {
+                FpsPermissionMessage = "FPS 权限配置已取消或未完成。";
+            }
+        }
+        catch (Exception exception)
+        {
+            FpsPermissionMessage = "FPS 权限配置失败，请查看日志。";
+            _logger.LogError(exception, "配置 FPS 采集权限失败");
+        }
+        finally
+        {
+            _isFpsPermissionBusy = false;
+            _configureFpsPermissionCommand.RaiseCanExecuteChanged();
         }
     }
 
