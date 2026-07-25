@@ -21,7 +21,8 @@ dotnet test TopMonitor.sln -c Release --no-build
 可直接运行：
 
 ```powershell
-.\scripts\publish-win-x64.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\publish-win-x64.ps1
 ```
 
 等价的 publish 命令为：
@@ -36,6 +37,18 @@ dotnet publish src/TopMonitor.App/TopMonitor.App.csproj `
 ```
 
 `self-contained` 会携带 .NET 运行时，目标电脑无需预装 .NET。最终便携版目录是 `artifacts/publish/win-x64/`，分发时压缩并传递整个目录，不要只复制 exe。
+
+发布脚本会先下载并校验固定依赖：
+
+- PresentMon 2.4.1 x64，SHA-256
+  `D74183E7AE630F72CD3690BE0373ECBFDC6CBB86578148AAB8FA2A7166068F34`
+- LibreHardwareMonitor 0.9.6 所带 PawnIO 安装器，SHA-256
+  `A3A46226C5E2824F4CDD42BE0EECBABFC672C86F7889710F5AB1E6AD385B47A0`
+
+来源、许可证和完整链接记录在 `third_party/NOTICE.md`。发布后两者位于
+`artifacts/publish/win-x64/Dependencies/`。本次 Windows 验证中，
+PresentMon 的 Authenticode 签名状态为 `Valid`（Intel Corporation），
+PawnIO 安装器为 `Valid`（namazso.eu）。
 
 ## 单文件限制
 
@@ -56,11 +69,20 @@ dotnet publish src/TopMonitor.App/TopMonitor.App.csproj `
 
 1. 解压完整便携版目录并双击 `TopMonitor.exe`。
 2. 确认悬浮窗和托盘图标出现，设置可保存。
-3. 确认 CPU、内存、网络以及可用温度/负载指标更新。
-4. 验证拖动、置顶、点击穿透、显示器切换、休眠恢复和退出。
-5. 重启应用，确认配置恢复；选择开机启动后检查登录行为。
-6. 检查 `%LocalAppData%\TopMonitor\logs\` 无持续异常。
-7. 在未安装 .NET 的机器复测自包含启动。
+3. 在设置 → 行为初始化 CPU 温度访问，确认 UAC 后验证 CPU 温度和
+   `CPU temperature discovery` 日志。
+4. 配置 FPS 权限，注销并重新登录；启用 FPS 后用 DirectX/OpenGL/Vulkan
+   游戏验证整数帧率。
+5. 让 CPU/GPU/网络数值变化，确认悬浮窗宽度不随实时值改变。
+6. Alt+Tab 少于五秒，确认 PresentMon 不快速反复启动；退出游戏后 FPS
+   应变为 `--`。
+7. 验证拖动、置顶、点击穿透、显示器切换、休眠恢复和退出。
+8. 重启应用，确认配置恢复；选择开机启动后检查登录行为。
+9. 检查 `%LocalAppData%\TopMonitor\logs\` 无持续异常。
+10. 从托盘退出后执行
+    `Get-Process TopMonitor,PresentMon -ErrorAction SilentlyContinue`，确认
+    没有 TopMonitor 或其拥有的 PresentMon 进程残留。
+11. 在未安装 .NET 的机器复测自包含启动。
 
 只有以上检查完成后，才能宣称便携包可在 Windows 双击运行。
 

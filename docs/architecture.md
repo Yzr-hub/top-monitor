@@ -62,18 +62,38 @@ App ViewModels ──binding──> WPF Overlay / Settings / Tray
 
 ## 权限模型
 
-默认桌面进程以普通用户权限运行。CPU 使用率、内存、网络和部分公开传感器通常不要求管理员权限；主板、风扇、电压、嵌入式控制器或底层驱动访问可能受系统策略限制。当前程序不会自动提权，也不会绕过驱动或反作弊保护。读取失败时指标应显示不可用并记录日志，而不是让应用退出。
+默认桌面进程始终以普通用户权限运行。CPU 使用率、内存、网络和 GPU
+公开传感器通常不要求管理员权限。Intel CPU 温度通过
+LibreHardwareMonitor + PawnIO 读取；用户只在设置页点击“初始化 CPU
+温度访问”时启动一次签名的 PawnIO 安装程序并确认 UAC，之后 TopMonitor
+仍以普通用户运行。
 
-## FPS 扩展方案
+PresentMon 的 ETW 读取需要当前账户属于 Windows 内置的
+`Performance Log Users` 组。设置页使用固定 SID `S-1-5-32-559` 完成一次
+配置，不依赖系统显示语言；配置后必须注销并重新登录 Windows，使新的
+访问令牌包含该组。
 
-FPS 不应通过 WPF 或 LibreHardwareMonitor 猜测。后续可新增独立 `IFpsMetricProvider`，基于 PresentMon/ETW 消费目标进程的 Present 事件：
+应用不会自动提权、关闭安全功能或绕过驱动/反作弊保护。读取失败时指标
+显示不可用或权限受限并记录日志，不会用估算值替代。
 
-1. 用户选择或自动识别前台进程。
-2. 采集模块以进程 ID 聚合帧呈现时间。
-3. 计算滑动窗口 FPS、帧时间和 1% Low。
-4. 通过现有 `MetricValue` 接入缓存与 UI。
+## FPS 数据流与生命周期
 
-ETW 会涉及会话权限、游戏反作弊兼容性、进程切换和较高数据量，因此应默认关闭并独立限流。不能支持的游戏必须明确显示不可用。
+`PresentMonFpsProvider` 通过现有 `IMetricProvider` 暴露
+`graphics.foreground.fps`。只有 FPS Widget 启用时，采样器才会调用它：
+
+1. `WindowsForegroundProcessService` 读取当前前台窗口的 PID，并排除桌面
+   Shell 和 TopMonitor 自身。
+2. PID 稳定 750ms 后，`ForegroundFpsTracker` 启动一个只针对该数字 PID
+   的 PresentMon 子进程。
+3. CSV 解析器按表头找列，1 秒滑动窗口根据真实 Present 事件计算整数 FPS。
+4. 两秒内没有任何帧的进程按其 PID + 启动时间缓存为非游戏，避免反复启动。
+5. Alt+Tab 使用五秒宽限，避免短暂切换导致频繁重启 ETW 会话。
+6. 游戏、设置或应用退出时取消读取；最多等待两秒后只终止自己创建的
+   PresentMon 进程树。
+
+没有游戏、依赖缺失、权限不足或图形 API 不受支持时 FPS 显示 `--`。
+PresentMon 支持的 DirectX/OpenGL/Vulkan 范围仍受游戏、反作弊和系统策略
+限制，不保证覆盖所有进程。
 
 ## 高权限采集进程拆分方案
 
