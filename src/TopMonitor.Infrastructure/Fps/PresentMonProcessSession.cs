@@ -7,6 +7,7 @@ namespace TopMonitor.Infrastructure.Fps;
 public sealed class PresentMonProcessSession(Process process) : IPresentMonSession
 {
     private readonly CancellationTokenSource _readCancellation = new();
+    private readonly Task<string> _standardError = process.StandardError.ReadToEndAsync();
     private bool _disposed;
 
     public async IAsyncEnumerable<PresentedFrame> ReadFramesAsync(
@@ -26,6 +27,16 @@ public sealed class PresentMonProcessSession(Process process) : IPresentMonSessi
                 linkedCancellation.Token);
             if (line is null)
             {
+                await process.WaitForExitAsync(linkedCancellation.Token);
+                var error = await _standardError;
+                if (process.ExitCode != 0)
+                {
+                    throw new InvalidOperationException(
+                        string.IsNullOrWhiteSpace(error)
+                            ? $"PresentMon 异常退出，代码：{process.ExitCode}。"
+                            : error.Trim());
+                }
+
                 yield break;
             }
 

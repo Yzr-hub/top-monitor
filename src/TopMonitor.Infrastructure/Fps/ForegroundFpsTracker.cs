@@ -9,14 +9,12 @@ public sealed class ForegroundFpsTracker(
 {
     private static readonly TimeSpan CandidateDebounce =
         TimeSpan.FromMilliseconds(750);
-    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ForegroundGrace = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan RestartBackoff = TimeSpan.FromSeconds(10);
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _frameSync = new();
-    private readonly HashSet<ProcessKey> _nonGameProcesses = [];
-    private readonly Queue<ProcessKey> _nonGameOrder = [];
     private IPresentMonSession? _session;
     private CancellationTokenSource? _sessionCancellation;
     private Task? _readerTask;
@@ -60,7 +58,8 @@ public sealed class ForegroundFpsTracker(
                     ClearCandidate();
                     if (HasProbeTimedOut(now))
                     {
-                        CacheNonGame(active);
+                        _restartProcess = active;
+                        _restartAfter = now + RestartBackoff;
                         await StopSessionAsync();
                         return null;
                     }
@@ -77,8 +76,7 @@ public sealed class ForegroundFpsTracker(
                 await StopSessionAsync();
             }
 
-            if (foregroundKey is not { } target ||
-                _nonGameProcesses.Contains(target))
+            if (foregroundKey is not { } target)
             {
                 if (foregroundKey is null)
                 {
@@ -231,19 +229,6 @@ public sealed class ForegroundFpsTracker(
     {
         _candidateProcess = null;
         _candidateSince = default;
-    }
-
-    private void CacheNonGame(ProcessKey process)
-    {
-        if (_nonGameProcesses.Add(process))
-        {
-            _nonGameOrder.Enqueue(process);
-        }
-
-        while (_nonGameOrder.Count > 128)
-        {
-            _nonGameProcesses.Remove(_nonGameOrder.Dequeue());
-        }
     }
 
     private async Task StopSessionAsync()

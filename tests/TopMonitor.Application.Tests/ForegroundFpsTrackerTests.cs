@@ -61,7 +61,7 @@ public sealed class ForegroundFpsTrackerTests
     }
 
     [Fact]
-    public async Task Process_without_frames_is_cached_until_start_time_changes()
+    public async Task Process_without_frames_is_retried_after_backoff()
     {
         var clock = new ManualTimeProvider(
             DateTimeOffset.Parse("2026-07-26T00:00:00Z"));
@@ -77,17 +77,12 @@ public sealed class ForegroundFpsTrackerTests
         await tracker.GetCurrentFpsAsync(CancellationToken.None);
         clock.Advance(TimeSpan.FromMilliseconds(750));
         await tracker.GetCurrentFpsAsync(CancellationToken.None);
-        clock.Advance(TimeSpan.FromSeconds(2));
+        clock.Advance(TimeSpan.FromSeconds(5));
         await tracker.GetCurrentFpsAsync(CancellationToken.None);
         await tracker.GetCurrentFpsAsync(CancellationToken.None);
         Assert.Equal([42], sessions.StartedProcessIds);
 
-        foreground.Current = foreground.Current! with
-        {
-            StartTime = firstStart.AddMinutes(5)
-        };
-        await tracker.GetCurrentFpsAsync(CancellationToken.None);
-        clock.Advance(TimeSpan.FromMilliseconds(750));
+        clock.Advance(TimeSpan.FromSeconds(10));
         await tracker.GetCurrentFpsAsync(CancellationToken.None);
 
         Assert.Equal([42, 42], sessions.StartedProcessIds);
