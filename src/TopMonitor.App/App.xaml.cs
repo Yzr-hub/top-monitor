@@ -43,6 +43,22 @@ public partial class App : System.Windows.Application
             var settingsService = JsonSettingsService.CreateForCurrentUser(Log.Logger);
             var settings = await settingsService.LoadAsync(CancellationToken.None);
             _services = ConfigureServices(settings, settingsService);
+            if (settings.AutoStart)
+            {
+                try
+                {
+                    _services
+                        .GetRequiredService<IStartupService>()
+                        .SetEnabled(true);
+                }
+                catch (Exception exception)
+                {
+                    Log.Warning(
+                        exception,
+                        "无法将旧版开机启动迁移为最高权限计划任务");
+                }
+            }
+
             _mainWindow = _services.GetRequiredService<MainWindow>();
             _settingsWindow = _services.GetRequiredService<SettingsWindow>();
             _mainWindow.ExitRequested += OnMainWindowExitRequested;
