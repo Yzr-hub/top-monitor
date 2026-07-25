@@ -7,6 +7,14 @@ namespace TopMonitor.Infrastructure.Windows;
 /// </summary>
 internal static class NativeMethods
 {
+    [DllImport("user32.dll")]
+    internal static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    internal static extern uint GetWindowThreadProcessId(
+        nint windowHandle,
+        out uint processId);
+
     /// <summary>
     /// 获取系统累计的空闲、内核和用户时间，用于计算两次采样之间的 CPU 利用率。
     /// WPF 不提供系统级 CPU 累计时间；调用失败时 Provider 返回不可用，不会终止程序。
