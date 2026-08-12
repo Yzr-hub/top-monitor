@@ -67,7 +67,6 @@ public sealed class PresentMonSessionFactory(string executablePath)
             processId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         startInfo.ArgumentList.Add("--output_stdout");
         startInfo.ArgumentList.Add("--v1_metrics");
-        startInfo.ArgumentList.Add("--terminate_on_proc_exit");
         startInfo.ArgumentList.Add("--session_name");
         startInfo.ArgumentList.Add("TopMonitorCapture");
         return startInfo;
