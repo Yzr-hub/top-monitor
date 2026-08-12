@@ -6,7 +6,7 @@ namespace TopMonitor.Infrastructure.Fps;
 public sealed class PresentMonSessionFactory(string executablePath)
     : IPresentMonSessionFactory
 {
-    public Task<IPresentMonSession> StartAsync(
+    public async Task<IPresentMonSession> StartAsync(
         int processId,
         CancellationToken cancellationToken)
     {
@@ -23,6 +23,8 @@ public sealed class PresentMonSessionFactory(string executablePath)
                 executablePath);
         }
 
+        await CleanupExistingSessionAsync(cancellationToken);
+
         var process = new Process
         {
             StartInfo = CreateStartInfo(executablePath, processId)
@@ -34,8 +36,7 @@ public sealed class PresentMonSessionFactory(string executablePath)
                 throw new InvalidOperationException("PresentMon 进程启动失败。");
             }
 
-            return Task.FromResult<IPresentMonSession>(
-                new PresentMonProcessSession(process));
+            return new PresentMonProcessSession(process);
         }
         catch
         {
@@ -69,7 +70,52 @@ public sealed class PresentMonSessionFactory(string executablePath)
         startInfo.ArgumentList.Add("--terminate_on_proc_exit");
         startInfo.ArgumentList.Add("--session_name");
         startInfo.ArgumentList.Add("TopMonitorCapture");
-        startInfo.ArgumentList.Add("--stop_existing_session");
         return startInfo;
     }
+
+    public static ProcessStartInfo CreateCleanupStartInfo(string executablePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
+        var startInfo = CreateBaseStartInfo(executablePath);
+        startInfo.ArgumentList.Add("--terminate_existing_session");
+        startInfo.ArgumentList.Add("--session_name");
+        startInfo.ArgumentList.Add("TopMonitorCapture");
+        return startInfo;
+    }
+
+    private async Task CleanupExistingSessionAsync(
+        CancellationToken cancellationToken)
+    {
+        using var cleanup = new Process
+        {
+            StartInfo = CreateCleanupStartInfo(executablePath)
+        };
+        if (!cleanup.Start())
+        {
+            throw new InvalidOperationException(
+                "PresentMon 会话清理进程启动失败。");
+        }
+
+        var output = cleanup.StandardOutput.ReadToEndAsync(cancellationToken);
+        var error = cleanup.StandardError.ReadToEndAsync(cancellationToken);
+        await cleanup.WaitForExitAsync(cancellationToken);
+        await Task.WhenAll(output, error);
+        if (cleanup.ExitCode != 0)
+        {
+            var message = (await error).Trim();
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(message)
+                    ? $"PresentMon 会话清理失败，代码：{cleanup.ExitCode}。"
+                    : message);
+        }
+    }
+
+    private static ProcessStartInfo CreateBaseStartInfo(string executablePath) =>
+        new(executablePath)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
 }

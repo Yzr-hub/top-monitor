@@ -56,7 +56,7 @@ public sealed class ForegroundFpsTracker(
                 {
                     _lastActiveForeground = now;
                     ClearCandidate();
-                    if (HasProbeTimedOut(now))
+                    if (HasSessionStopped() || HasFrameStreamStalled(now))
                     {
                         _restartProcess = active;
                         _restartAfter = now + RestartBackoff;
@@ -205,13 +205,20 @@ public sealed class ForegroundFpsTracker(
         }
     }
 
-    private bool HasProbeTimedOut(DateTimeOffset now)
+    private bool HasFrameStreamStalled(DateTimeOffset now)
     {
         lock (_frameSync)
         {
-            return _frameCount == 0 && now >= _probeDeadline;
+            if (_frameCount == 0)
+            {
+                return now >= _probeDeadline;
+            }
+
+            return now - _lastFrameReceived >= ProbeTimeout;
         }
     }
+
+    private bool HasSessionStopped() => _readerTask?.IsCompleted == true;
 
     private bool TrackCandidate(ProcessKey? candidate, DateTimeOffset now)
     {

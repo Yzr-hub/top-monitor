@@ -89,6 +89,69 @@ public sealed class ForegroundFpsTrackerTests
     }
 
     [Fact]
+    public async Task Completed_reader_after_receiving_frames_is_retried_after_backoff()
+    {
+        var clock = new ManualTimeProvider(
+            DateTimeOffset.Parse("2026-07-26T00:00:00Z"));
+        var foreground = new FakeForegroundProcessService(
+            new ForegroundProcessInfo(42, "game", DateTimeOffset.UtcNow));
+        var sessions = new FakePresentMonSessionFactory
+        {
+            CompleteFirstSessionAfterFrames = true
+        };
+        await using var tracker = new ForegroundFpsTracker(
+            foreground,
+            sessions,
+            clock);
+
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromMilliseconds(750));
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+        await sessions.Sessions[0].ReaderCompleted.Task.WaitAsync(
+            TimeSpan.FromSeconds(1));
+
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+
+        Assert.True(sessions.Sessions[0].IsDisposed);
+        Assert.Equal([42, 42], sessions.StartedProcessIds);
+    }
+
+    [Fact]
+    public async Task Stalled_reader_after_receiving_frames_is_retried_after_backoff()
+    {
+        var clock = new ManualTimeProvider(
+            DateTimeOffset.Parse("2026-07-26T00:00:00Z"));
+        var foreground = new FakeForegroundProcessService(
+            new ForegroundProcessInfo(42, "game", DateTimeOffset.UtcNow));
+        var sessions = new FakePresentMonSessionFactory
+        {
+            StallFirstSessionAfterFrames = true
+        };
+        await using var tracker = new ForegroundFpsTracker(
+            foreground,
+            sessions,
+            clock);
+
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromMilliseconds(750));
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+        await sessions.Sessions[0].FramesEmitted.Task.WaitAsync(
+            TimeSpan.FromSeconds(1));
+
+        clock.Advance(TimeSpan.FromSeconds(5));
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await tracker.GetCurrentFpsAsync(CancellationToken.None);
+
+        Assert.True(sessions.Sessions[0].IsDisposed);
+        Assert.Equal([42, 42], sessions.StartedProcessIds);
+    }
+
+    [Fact]
     public async Task Cancellation_disposes_owned_session()
     {
         var clock = new ManualTimeProvider(
@@ -149,6 +212,10 @@ public sealed class ForegroundFpsTrackerTests
 
     private sealed class FakePresentMonSessionFactory : IPresentMonSessionFactory
     {
+        public bool CompleteFirstSessionAfterFrames { get; init; }
+
+        public bool StallFirstSessionAfterFrames { get; init; }
+
         public List<int> StartedProcessIds { get; } = [];
 
         public List<FakePresentMonSession> Sessions { get; } = [];
@@ -158,19 +225,43 @@ public sealed class ForegroundFpsTrackerTests
             CancellationToken cancellationToken)
         {
             StartedProcessIds.Add(processId);
-            var session = new FakePresentMonSession();
+            var session = new FakePresentMonSession(
+                CompleteFirstSessionAfterFrames && Sessions.Count == 0,
+                StallFirstSessionAfterFrames && Sessions.Count == 0);
             Sessions.Add(session);
             return Task.FromResult<IPresentMonSession>(session);
         }
     }
 
-    private sealed class FakePresentMonSession : IPresentMonSession
+    private sealed class FakePresentMonSession(
+        bool completeAfterFrames = false,
+        bool stallAfterFrames = false)
+        : IPresentMonSession
     {
         public bool IsDisposed { get; private set; }
+
+        public TaskCompletionSource ReaderCompleted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource FramesEmitted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async IAsyncEnumerable<PresentedFrame> ReadFramesAsync(
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
+            if (completeAfterFrames || stallAfterFrames)
+            {
+                yield return new PresentedFrame(42, 0.000, "Composed: Flip");
+                yield return new PresentedFrame(42, 0.016, "Composed: Flip");
+                FramesEmitted.TrySetResult();
+            }
+
+            if (completeAfterFrames)
+            {
+                ReaderCompleted.TrySetResult();
+                yield break;
+            }
+
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             yield break;
         }
