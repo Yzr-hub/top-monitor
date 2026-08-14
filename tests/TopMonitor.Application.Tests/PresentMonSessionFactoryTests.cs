@@ -32,4 +32,14 @@ public sealed class PresentMonSessionFactoryTests
             "--terminate_existing_session --session_name TopMonitorCapture",
             string.Join(" ", options.ArgumentList));
     }
+
+    [Fact]
+    public void Cleanup_accepts_missing_session_as_already_clean()
+    {
+        const string error = "error: no existing sessions found: TopMonitorCapture";
+
+        Assert.True(PresentMonSessionFactory.IsCleanupSuccessful(7, error));
+        Assert.True(PresentMonSessionFactory.IsCleanupSuccessful(0, string.Empty));
+        Assert.False(PresentMonSessionFactory.IsCleanupSuccessful(7, "access denied"));
+    }
 }

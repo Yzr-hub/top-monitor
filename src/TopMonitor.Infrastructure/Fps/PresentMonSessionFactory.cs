@@ -99,15 +99,21 @@ public sealed class PresentMonSessionFactory(string executablePath)
         var error = cleanup.StandardError.ReadToEndAsync(cancellationToken);
         await cleanup.WaitForExitAsync(cancellationToken);
         await Task.WhenAll(output, error);
-        if (cleanup.ExitCode != 0)
+        var errorMessage = (await error).Trim();
+        if (!IsCleanupSuccessful(cleanup.ExitCode, errorMessage))
         {
-            var message = (await error).Trim();
             throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(message)
+                string.IsNullOrWhiteSpace(errorMessage)
                     ? $"PresentMon 会话清理失败，代码：{cleanup.ExitCode}。"
-                    : message);
+                    : errorMessage);
         }
     }
+
+    public static bool IsCleanupSuccessful(int exitCode, string standardError) =>
+        exitCode == 0 ||
+        (exitCode == 7 && standardError.Contains(
+            "no existing sessions found",
+            StringComparison.OrdinalIgnoreCase));
 
     private static ProcessStartInfo CreateBaseStartInfo(string executablePath) =>
         new(executablePath)
